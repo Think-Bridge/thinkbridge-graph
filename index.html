@@ -1,0 +1,151 @@
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
+
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+    }
+
+    div {
+      white-space: pre-line;
+      text-align: center;
+    }
+
+    .manager-label {
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background-color: rgba(0,0,0,0.5);
+      user-select: none;
+    }
+
+    .open-label {
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background-color: rgba(0,0,0,0.5);
+      user-select: none;
+    }
+
+    .closed-label {
+      font-size: 12px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background-color: rgba(0,0,0,0.5);
+      user-select: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="3d-graph"></div>
+
+  <script type="module">
+    import { CSS2DRenderer, CSS2DObject } from 'https://esm.sh/three/examples/jsm/renderers/CSS2DRenderer.js';
+
+    var gData = await getJSON('https://raw.githubusercontent.com/finani/thinkbridge-graph/refs/heads/master/data.json');
+
+    // cross-link node objects
+    gData.links.forEach(link => {
+      const a = gData.nodes.find(obj => obj.id === link.source);
+      const b = gData.nodes.find(obj => obj.id === link.target);
+      !a.neighbors && (a.neighbors = []);
+      !b.neighbors && (b.neighbors = []);
+      a.neighbors.push(b);
+      b.neighbors.push(a);
+
+      !a.links && (a.links = []);
+      !b.links && (b.links = []);
+      a.links.push(link);
+      b.links.push(link);
+    });
+
+    const highlightNodes = new Set();
+    const highlightLinks = new Set();
+    let hoverNode = null;
+
+    const Graph = new ForceGraph3D(document.getElementById('3d-graph'), {
+      extraRenderers: [new CSS2DRenderer()]
+    })
+      .graphData(gData)
+      .nodeVal(node => node.role === 'manager' ? 125 : node.role === 'open' ? 25 : 5)
+      .nodeVisibility(node => !highlightNodes.size || highlightNodes.has(node))
+      .nodeAutoColorBy('group')
+      .nodeResolution(64)
+      .nodeThreeObject(node => {
+        const nodeEl = document.createElement('div');
+        nodeEl.textContent = '[' + node.group + '] ' + node.subgroup + '\n' + node.id;
+        nodeEl.style.color = node.color;
+        nodeEl.className = node.role === 'manager' ? 'manager-label' : node.role === 'open' ? 'open-label' : 'closed-label';
+        return new CSS2DObject(nodeEl);
+      })
+      .nodeThreeObjectExtend(true)
+      .linkVisibility(link => !highlightLinks.size || highlightLinks.has(link))
+      .linkWidth(link => highlightLinks.has(link) ? 4 : 1)
+      .linkDirectionalArrowLength(2)
+      .linkDirectionalArrowRelPos(0.1)
+      .linkDirectionalParticles(link => highlightLinks.has(link) ? 4 : 0)
+      .linkDirectionalParticleWidth(4)
+      .onNodeHover(node => {
+        // no state change
+        if ((!node && !highlightNodes.size) || (node && hoverNode === node)) return;
+
+        highlightNodes.clear();
+        highlightLinks.clear();
+        if (node) {
+          highlightNodes.add(node);
+          node.neighbors.forEach(neighbor => highlightNodes.add(neighbor));
+          node.links.forEach(link => highlightLinks.add(link));
+        }
+
+        hoverNode = node || null;
+
+        updateHighlight();
+      })
+      .onLinkHover(link => {
+        highlightNodes.clear();
+        highlightLinks.clear();
+
+        if (link) {
+          highlightLinks.add(link);
+          highlightNodes.add(link.source);
+          highlightNodes.add(link.target);
+        }
+
+        updateHighlight();
+      })
+      .onNodeClick(node => {
+        // Aim at node from outside it
+        const distance = 100;
+        const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+        const newPos = node.x || node.y || node.z
+          ? { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }
+          : { x: 0, y: 0, z: distance }; // special case if node is in (0,0,0)
+
+        Graph.cameraPosition(
+          newPos, // new position
+          node, // lookAt ({ x, y, z })
+          2000  // ms transition duration
+        );
+      });
+
+    async function getJSON(url) {
+      const jsonData = await (await fetch(url)).json();
+      return jsonData
+    }
+
+    function updateHighlight() {
+      // trigger update of highlighted objects in scene
+      Graph
+        .nodeColor(Graph.nodeColor())
+        .linkWidth(Graph.linkWidth())
+        .linkDirectionalParticles(Graph.linkDirectionalParticles());
+    }
+  </script>
+</body>

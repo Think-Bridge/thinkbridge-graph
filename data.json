@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    {"id": "Inhwan Wee", "group": "Tech", "subgroup": "Robotics", "role": "manager"},
+    {"id": "A", "group": "Tech", "subgroup": "AI", "role": "closed"},
+    {"id": "B", "group": "Finance", "subgroup": "Real Estate", "role": "open"},
+    {"id": "C", "group": "Finance", "subgroup": "Bank", "role": "closed"},
+    {"id": "D", "group": "Tech", "subgroup": "Robotics", "role": "closed"}
+  ],
+  "links": [
+    {"source": "Inhwan Wee", "target": "A"},
+    {"source": "Inhwan Wee", "target": "B"},
+    {"source": "Inhwan Wee", "target": "D"},
+    {"source": "B", "target": "C"}
+  ]
+}
